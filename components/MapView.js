@@ -1,127 +1,113 @@
-import { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-
-// Fix Leaflet default icon issue in Next.js
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+import { useEffect, useRef } from 'react';
 
 const SEVERITY_COLORS = {
-  1: { bg: '#16a34a', label: 'Low', text: '#fff' },
-  2: { bg: '#84cc16', label: 'Minor', text: '#fff' },
-  3: { bg: '#f97316', label: 'Moderate', text: '#fff' },
-  4: { bg: '#dc2626', label: 'High', text: '#fff' },
-  5: { bg: '#7f1d1d', label: 'Critical', text: '#fff' },
+  1: '#22c55e',
+  2: '#86efac',
+  3: '#f97316',
+  4: '#f87171',
+  5: '#dc2626',
 };
 
-function createDotIcon(severity) {
-  const color = SEVERITY_COLORS[severity]?.bg || '#16a34a';
-  const size = severity >= 4 ? 18 : 14;
-  return L.divIcon({
-    className: '',
-    html: `
-      <div style="
-        width:${size}px;
-        height:${size}px;
-        background:${color};
-        border-radius:50%;
-        border:2.5px solid white;
-        box-shadow:0 2px 8px rgba(0,0,0,0.35);
-        position:relative;
-      ">
-        ${severity >= 4 ? `<div style="position:absolute;inset:-4px;border-radius:50%;background:${color};opacity:0.3;animation:none;"></div>` : ''}
-      </div>
-    `,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-    popupAnchor: [0, -(size / 2) - 4],
-  });
-}
+const SEVERITY_LABELS = {
+  1: 'Low',
+  2: 'Minor',
+  3: 'Moderate',
+  4: 'High',
+  5: 'Critical',
+};
 
-function AutoFitBounds({ observations }) {
-  const map = useMap();
+export default function MapView({ observations = [], onDelete }) {
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markersRef = useRef([]);
+
   useEffect(() => {
-    if (observations.length === 0) return;
-    const bounds = observations.map((o) => [o.latitude, o.longitude]);
-    if (bounds.length === 1) {
-      map.setView(bounds[0], 15);
-    } else {
-      map.fitBounds(bounds, { padding: [40, 40] });
-    }
-  }, [observations.length]);
-  return null;
-}
+    if (typeof window === 'undefined') return;
 
-function PopupContent({ obs }) {
-  const sev = SEVERITY_COLORS[obs.severity];
+    const initMap = async () => {
+      const L = (await import('leaflet')).default;
+      await import('leaflet/dist/leaflet.css');
+
+      if (!mapInstanceRef.current) {
+        mapInstanceRef.current = L.map(mapRef.current).setView(
+          [20.9374, 77.7793],
+          13
+        );
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+        }).addTo(mapInstanceRef.current);
+      }
+
+      // Remove old markers
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current = [];
+
+      // Add markers
+      observations.forEach(obs => {
+        const color = SEVERITY_COLORS[obs.severity] || '#f97316';
+        const label = SEVERITY_LABELS[obs.severity] || obs.severity;
+
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="
+            width:14px;height:14px;border-radius:50%;
+            background:${color};border:2px solid white;
+            box-shadow:0 1px 4px rgba(0,0,0,0.4);">
+          </div>`,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+        });
+
+        const marker = L.marker([obs.latitude, obs.longitude], { icon });
+
+        const popupId = `popup-${obs.id}`;
+        const deleteId = `delete-${obs.id}`;
+        const time = new Date(obs.timestamp).toLocaleString('en-AU', {
+          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+        });
+
+        const popupHtml = `
+          <div id="${popupId}" style="min-width:180px;font-family:sans-serif;">
+            ${obs.photo ? `<img src="${obs.photo}" style="width:100%;height:110px;object-fit:cover;border-radius:6px;margin-bottom:8px;" />` : ''}
+            <div style="font-weight:600;margin-bottom:4px;">${obs.ward}</div>
+            <div style="font-size:12px;color:#666;margin-bottom:2px;">
+              Severity: <span style="color:${color};font-weight:600;">S${obs.severity} — ${label}</span>
+            </div>
+            ${obs.notes ? `<div style="font-size:12px;color:#555;margin-bottom:4px;">${obs.notes}</div>` : ''}
+            <div style="font-size:11px;color:#999;margin-bottom:8px;">${time}</div>
+            <button id="${deleteId}" style="
+              width:100%;padding:6px;border:none;border-radius:6px;
+              background:#fee2e2;color:#dc2626;font-size:12px;
+              font-weight:600;cursor:pointer;">
+              🗑 Delete Report
+            </button>
+          </div>
+        `;
+
+        marker.bindPopup(popupHtml, { maxWidth: 220 });
+
+        marker.on('popupopen', () => {
+          const btn = document.getElementById(deleteId);
+          if (btn && onDelete) {
+            btn.onclick = () => {
+              marker.closePopup();
+              onDelete(obs.id);
+            };
+          }
+        });
+
+        marker.addTo(mapInstanceRef.current);
+        markersRef.current.push(marker);
+      });
+    };
+
+    initMap();
+  }, [observations, onDelete]);
+
   return (
-    <div style={{ fontFamily: 'DM Sans, sans-serif', minWidth: '200px', maxWidth: '240px' }}>
-      {obs.photo && (
-        <div style={{ borderRadius: '10px 10px 0 0', overflow: 'hidden', height: '130px' }}>
-          <img src={obs.photo} alt="Garbage" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </div>
-      )}
-      <div style={{ padding: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>
-            {obs.ward}
-          </span>
-          <span style={{
-            background: sev.bg,
-            color: sev.text,
-            padding: '2px 8px',
-            borderRadius: '99px',
-            fontSize: '11px',
-            fontWeight: 600,
-          }}>
-            S{obs.severity} · {sev.label}
-          </span>
-        </div>
-        {obs.notes && (
-          <p style={{ fontSize: '12px', color: '#475569', marginBottom: '8px', lineHeight: 1.5 }}>{obs.notes}</p>
-        )}
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <circle cx="6" cy="6" r="5" stroke="#94a3b8" strokeWidth="1.2"/>
-            <path d="M6 3.5V6L7.5 7.5" stroke="#94a3b8" strokeWidth="1.2" strokeLinecap="round"/>
-          </svg>
-          <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-            {new Date(obs.timestamp).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Amravati city center
-const AMRAVATI_CENTER = [20.9320, 77.7523];
-
-export default function MapView({ observations }) {
-  return (
-    <MapContainer
-      center={AMRAVATI_CENTER}
-      zoom={13}
-      style={{ height: '100%', width: '100%' }}
-      zoomControl={true}
-    >
-      <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        maxZoom={19}
-      />
-      {observations.length > 0 && <AutoFitBounds observations={observations} />}
-      {observations.map((obs) => (
-        <Marker key={obs.id} position={[obs.latitude, obs.longitude]} icon={createDotIcon(obs.severity)}>
-          <Popup>
-            <PopupContent obs={obs} />
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
+    <div
+      ref={mapRef}
+      style={{ width: '100%', height: '100%', minHeight: '400px' }}
+    />
   );
 }
