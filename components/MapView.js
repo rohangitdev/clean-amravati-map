@@ -1,10 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { supabase } from '../lib/supabaseClient';
 
 const SEVERITY_COLORS = {
   1: '#22c55e',
@@ -206,8 +201,7 @@ export default function MapView({ observations = [], onDelete, onCleaned }) {
 
         const popupHtml = `
           <div style="min-width:190px;font-family:sans-serif;">
-            ${obs.photo_url ? `<img src="${obs.photo_url}" style="width:100%;height:100px;object-fit:cover;border-radius:6px;margin-bottom:8px;"/>` : ''}
-            ${obs.photo    ? `<img src="${obs.photo}"     style="width:100%;height:100px;object-fit:cover;border-radius:6px;margin-bottom:8px;"/>` : ''}
+            ${(obs.photo_url || obs.photo) ? `<img src="${obs.photo_url || obs.photo}" style="width:100%;height:100px;object-fit:cover;border-radius:6px;margin-bottom:8px;"/>` : ''}
             <div style="font-weight:600;margin-bottom:4px;">${obs.ward || ''}</div>
             <div style="font-size:12px;color:#666;margin-bottom:2px;">
               Severity: <span style="color:${color};font-weight:600;">${obs.severity} — ${label}</span>
