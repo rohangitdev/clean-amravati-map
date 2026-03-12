@@ -4,10 +4,6 @@ import Layout from '../components/Layout';
 import MapView from '../components/MapView';
 import { supabase } from '../lib/supabaseClient';
 
-const SEVERITY_LABELS = {
-  1: 'Low', 2: 'Minor', 3: 'Moderate', 4: 'High', 5: 'Critical'
-};
-
 export default function Dashboard() {
   const [observations, setObservations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,14 +16,21 @@ export default function Dashboard() {
 
     if (!error && data) {
       setObservations(data.map(row => ({
-        id: row.id,
-        photo: row.photo_url,
-        latitude: row.latitude,
-        longitude: row.longitude,
-        ward: row.ward,
-        severity: row.severity,
-        notes: row.notes,
-        timestamp: row.created_at,
+        id:              row.id,
+        photo:           row.photo_url,
+        photo_url:       row.photo_url,
+        latitude:        row.latitude,
+        longitude:       row.longitude,
+        ward:            row.ward,
+        severity:        row.severity,
+        notes:           row.notes,
+        timestamp:       row.created_at,
+        created_at:      row.created_at,
+        // Cleanup flow fields
+        status:          row.status          ?? 'open',
+        cleaned_at:      row.cleaned_at      ?? null,
+        cleaned_by:      row.cleaned_by      ?? null,
+        after_photo_url: row.after_photo_url ?? null,
       })));
     }
     setLoading(false);
@@ -77,7 +80,11 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <MapView observations={observations} onDelete={handleDelete} />
+          <MapView
+            observations={observations}
+            onDelete={handleDelete}
+            onCleaned={fetchObservations}
+          />
         )}
       </Layout>
     </>
