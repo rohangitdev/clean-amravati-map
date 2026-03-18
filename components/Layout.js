@@ -30,6 +30,12 @@ export default function Layout({ children, observations = [] }) {
               }`}>
               Map
             </Link>
+            <Link href="/leaderboard"
+  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+    router.pathname === '/leaderboard' ? 'bg-green-50 text-green-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+  }`}>
+  🏆 Leaderboard
+</Link>
             <Link href="/report"
               className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 flex items-center gap-1.5">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
