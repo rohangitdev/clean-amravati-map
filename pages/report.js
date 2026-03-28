@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import { supabase } from '../lib/supabaseClient';
+import { estimateEffort } from '../lib/effortEstimation';
 
 const WARDS = ['Ward 1', 'Ward 2', 'Ward 3', 'Ward 4'];
 
@@ -91,7 +92,10 @@ export default function ReportPage() {
 
       const photo_url = urlData.publicUrl;
 
-      // 3. Insert row into observations table
+      // 3. Calculate effort estimate (Phase 1: rule-based)
+      const { hours: effort_hours, basis: effort_notes } = estimateEffort(severity, notes);
+
+      // 4. Insert row into observations table
       const { error: insertError } = await supabase
         .from('observations')
         .insert({
@@ -101,6 +105,8 @@ export default function ReportPage() {
           ward,
           severity,
           notes: notes.trim() || null,
+          effort_hours,
+          effort_notes,
         });
 
       if (insertError) throw insertError;

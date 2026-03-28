@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Layout from '../components/Layout';
 import MapView from '../components/MapView';
 import { supabase } from '../lib/supabaseClient';
+import { formatEffort } from '../lib/effortEstimation';
 
 export default function Dashboard() {
   const [observations, setObservations] = useState([]);
@@ -31,6 +32,9 @@ export default function Dashboard() {
         cleaned_at:      row.cleaned_at      ?? null,
         cleaned_by:      row.cleaned_by      ?? null,
         after_photo_url: row.after_photo_url ?? null,
+        // Effort estimation
+        effort_hours:    row.effort_hours    ?? null,
+        effort_notes:    row.effort_notes    ?? null,
       })));
     }
     setLoading(false);
@@ -66,6 +70,10 @@ export default function Dashboard() {
     return () => supabase.removeChannel(channel);
   }, [fetchObservations]);
 
+  const openReports = observations.filter((o) => o.status !== 'cleaned');
+  const totalEffortHours = openReports.reduce((sum, o) => sum + (o.effort_hours || 0), 0);
+  const roundedTotal = Math.round(totalEffortHours * 10) / 10;
+
   return (
     <>
       <Head>
@@ -80,11 +88,27 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <MapView
-            observations={observations}
-            onDelete={handleDelete}
-            onCleaned={fetchObservations}
-          />
+          <div className="relative h-full w-full">
+            {roundedTotal > 0 && (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none">
+                <div className="bg-white/95 backdrop-blur-sm border border-amber-200 shadow-md rounded-full px-4 py-2 flex items-center gap-2 text-sm whitespace-nowrap">
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                    <circle cx="7.5" cy="7.5" r="6.5" stroke="#d97706" strokeWidth="1.3"/>
+                    <path d="M7.5 4V7.5L9.5 9.5" stroke="#d97706" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
+                  <span className="font-semibold text-amber-800">
+                    {formatEffort(roundedTotal)} of cleanup needed
+                  </span>
+                  <span className="text-slate-400">across {openReports.length} open report{openReports.length !== 1 ? 's' : ''}</span>
+                </div>
+              </div>
+            )}
+            <MapView
+              observations={observations}
+              onDelete={handleDelete}
+              onCleaned={fetchObservations}
+            />
+          </div>
         )}
       </Layout>
     </>
